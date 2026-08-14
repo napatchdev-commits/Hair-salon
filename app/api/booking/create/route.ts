@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { lineClient } from '@/lib/line/bot';
-import { createBookingConfirmationMessage, createAdminNewBookingMessage } from '@/lib/line/templates';
+import { createBookingConfirmationMessage } from '@/lib/line/templates';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +24,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' }, { status: 400 });
     }
 
-    // Call stored procedure for atomic conflict-free creation
     const { data: result, error: rpcError } = await supabaseAdmin.rpc('create_booking_atomic', {
       p_line_user_id: lineUserId,
       p_customer_name: customerName,
@@ -49,7 +50,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: friendlyMessage }, { status: 400 });
     }
 
-    // Fetch staff name for notifications
     const { data: staffData } = await supabaseAdmin
       .from('staff')
       .select('name, nickname')
@@ -60,7 +60,6 @@ export async function POST(req: NextRequest) {
       ? `ช่าง${staffData.name} ${staffData.nickname ? `(${staffData.nickname})` : ''}`
       : 'ช่าง';
 
-    // 1. Push notification to Customer via LINE
     try {
       const messages = createBookingConfirmationMessage({
         queueNumber: result.queue_number,
@@ -77,7 +76,6 @@ export async function POST(req: NextRequest) {
         messages: messages as any,
       });
 
-      // Log notification success
       await supabaseAdmin.from('notifications').insert({
         appointment_id: result.appointment_id,
         customer_id: result.customer_id,

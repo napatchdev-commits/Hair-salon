@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { canCancelAppointment } from '@/lib/utils/time';
 import { lineClient } from '@/lib/line/bot';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { appointmentId, newBookingDate, newStartTime, newStaffId, lineUserId } = await req.json();
@@ -11,7 +13,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required reschedule parameter' }, { status: 400 });
     }
 
-    // Fetch existing appointment
     const { data: oldAppt, error: fetchErr } = await supabaseAdmin
       .from('appointments')
       .select('*, customers(line_user_id, name, phone, email)')
@@ -22,7 +23,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่พบรายการคิวดังกล่าว' }, { status: 404 });
     }
 
-    // Check cancellation window policy
     const { data: settings } = await supabaseAdmin
       .from('settings')
       .select('min_cancel_hours')
@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: policyCheck.message }, { status: 400 });
     }
 
-    // Attempt to create new booking using atomic RPC
     const staffToUse = newStaffId || oldAppt.staff_id;
     const targetLineId = lineUserId || oldAppt.customers?.line_user_id;
 
@@ -58,13 +57,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: friendlyMessage }, { status: 400 });
     }
 
-    // Cancel old appointment
     await supabaseAdmin
       .from('appointments')
       .update({ status: 'cancelled', note: `เลื่อนนัดไปยังคิว #${newResult.queue_number}` })
       .eq('id', appointmentId);
 
-    // Notify customer via LINE
     if (targetLineId) {
       try {
         await lineClient.pushMessage({

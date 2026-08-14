@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { canCancelAppointment } from '@/lib/utils/time';
 import { lineClient } from '@/lib/line/bot';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { appointmentId, lineUserId, reason } = await req.json();
@@ -11,7 +13,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing appointmentId' }, { status: 400 });
     }
 
-    // Fetch appointment & settings
     const { data: appt, error: apptError } = await supabaseAdmin
       .from('appointments')
       .select('*, customers(line_user_id, name), services(name)')
@@ -33,13 +34,11 @@ export async function POST(req: NextRequest) {
 
     const minCancelHours = settings?.min_cancel_hours ?? 2;
 
-    // Validate cancellation policy
     const cancelCheck = canCancelAppointment(appt.booking_date, appt.start_time, minCancelHours);
     if (!cancelCheck.canCancel) {
       return NextResponse.json({ error: cancelCheck.message }, { status: 400 });
     }
 
-    // Update appointment status to cancelled
     const { error: updateError } = await supabaseAdmin
       .from('appointments')
       .update({ status: 'cancelled', note: reason ? `ยกเลิก: ${reason}` : appt.note })
@@ -49,7 +48,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    // Send LINE cancellation push message
     const customerLineId = lineUserId || appt.customers?.line_user_id;
     if (customerLineId) {
       try {
