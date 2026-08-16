@@ -19,6 +19,7 @@ export default function AdminSettingsPage() {
   const [advanceBookingDays, setAdvanceBookingDays] = useState<number>(30);
   const [reminder24h, setReminder24h] = useState<boolean>(true);
   const [reminder1h, setReminder1h] = useState<boolean>(true);
+  const [lineAdminUserId, setLineAdminUserId] = useState<string>('');
 
   const [successNotice, setSuccessNotice] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -47,6 +48,7 @@ export default function AdminSettingsPage() {
         setAdvanceBookingDays(data.advance_booking_days ?? 30);
         setReminder24h(data.reminder_24h_active ?? true);
         setReminder1h(data.reminder_1h_active ?? true);
+        setLineAdminUserId(data.line_admin_user_id || '');
       }
     } catch (err: any) {
       console.error(err);
@@ -78,6 +80,7 @@ export default function AdminSettingsPage() {
           advanceBookingDays,
           reminder24h,
           reminder1h,
+          lineAdminUserId,
         }),
       });
 
@@ -99,6 +102,7 @@ export default function AdminSettingsPage() {
         setAdvanceBookingDays(s.advance_booking_days ?? 30);
         setReminder24h(s.reminder_24h_active ?? true);
         setReminder1h(s.reminder_1h_active ?? true);
+        setLineAdminUserId(s.line_admin_user_id || '');
       }
 
       setSuccessNotice(true);
@@ -302,6 +306,18 @@ export default function AdminSettingsPage() {
             >
               {reminder1h ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
             </button>
+          </div>
+
+          <div className="p-3 bg-slate-900 rounded-xl border border-slate-700 space-y-1.5">
+            <label className="block font-bold text-white">LINE Admin User ID (สำหรับรับการแจ้งเตือนเจ้าของร้านเมื่อมีคิวใหม่)</label>
+            <p className="text-slate-400 text-[11px]">พิมพ์คำว่า <code className="text-amber-300 bg-slate-800 px-1 py-0.5 rounded">myid</code> ส่งเข้าไปในแชท LINE Official ของร้าน เพื่อรับ ID แล้วนำมาวางในช่องนี้</p>
+            <input
+              type="text"
+              placeholder="เช่น U1234567890abcdef1234567890abcdef"
+              value={lineAdminUserId}
+              onChange={(e) => setLineAdminUserId(e.target.value)}
+              className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-xs outline-none focus:border-salon-500"
+            />
           </div>
         </div>
       </div>

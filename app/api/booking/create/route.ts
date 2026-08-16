@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { lineClient } from '@/lib/line/bot';
-import { createBookingConfirmationMessage } from '@/lib/line/templates';
+import { createBookingConfirmationMessage, createAdminNewBookingMessage } from '@/lib/line/templates';
 
 export const dynamic = 'force-dynamic';
 
@@ -250,6 +250,32 @@ export async function POST(req: NextRequest) {
         status: 'failed',
         error_message: lineErr.message,
       });
+    }
+
+    // Push instant notification to Admin / Salon Owner
+    try {
+      const { data: setting } = await supabaseAdmin.from('settings').select('line_admin_user_id').maybeSingle();
+      const adminUserId = process.env.LINE_ADMIN_USER_ID || setting?.line_admin_user_id;
+
+      if (adminUserId && adminUserId.startsWith('U')) {
+        const adminMessages = createAdminNewBookingMessage({
+          queueNumber: result.queue_number,
+          customerName: customerName,
+          customerPhone: customerPhone,
+          serviceName: result.service_name,
+          staffName: staffDisplayName,
+          bookingDate: bookingDate,
+          startTime: startTime,
+          price: result.price,
+        });
+
+        await lineClient.pushMessage({
+          to: adminUserId,
+          messages: adminMessages as any,
+        });
+      }
+    } catch (adminErr: any) {
+      console.error('Admin LINE push notification failed:', adminErr);
     }
 
     return NextResponse.json({

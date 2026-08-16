@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       advanceBookingDays,
       reminder24h,
       reminder1h,
+      lineAdminUserId,
     } = body;
 
     const payload = {
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
       advance_booking_days: Number(advanceBookingDays) || 30,
       reminder_24h_active: Boolean(reminder24h),
       reminder_1h_active: Boolean(reminder1h),
+      line_admin_user_id: lineAdminUserId || '',
       updated_at: new Date().toISOString(),
     };
 

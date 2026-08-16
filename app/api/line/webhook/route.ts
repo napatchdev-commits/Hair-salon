@@ -18,11 +18,22 @@ export async function POST(req: NextRequest) {
 
     for (const event of events) {
       if (event.type === 'message' && event.message.type === 'text') {
-        const text = event.message.text.trim();
+        const text = event.message.text.trim().toLowerCase();
         const replyToken = event.replyToken;
+        const userId = event.source?.userId || '';
         const liffUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/liff` : 'https://liff.line.me/' + process.env.NEXT_PUBLIC_LIFF_ID;
 
-        if (text.includes('จองคิว') || text.includes('จอง')) {
+        if (text === 'myid' || text === 'id' || text === 'user id' || text.includes('แอดมิน') || text.includes('ไอดี')) {
+          await lineClient.replyMessage({
+            replyToken,
+            messages: [
+              {
+                type: 'text',
+                text: `🆔 LINE User ID ของคุณคือ:\n${userId}\n\nนำ ID นี้ไปใส่ในระบบแอดมิน (ตั้งค่าร้าน ➔ LINE Admin User ID) เพื่อรับการแจ้งเตือนอัตโนมัติเมื่อมีลูกค้ากดจองคิวเข้ามาได้ทันทีครับ!`
+              }
+            ]
+          });
+        } else if (text.includes('จองคิว') || text.includes('จอง')) {
           await lineClient.replyMessage({
             replyToken,
             messages: [
@@ -43,7 +54,6 @@ export async function POST(req: NextRequest) {
             ]
           });
         } else if (text.includes('บริการ') || text.includes('เมนู')) {
-          // Fetch active services from DB
           const { data: services } = await supabaseAdmin
             .from('services')
             .select('*')
@@ -69,7 +79,6 @@ export async function POST(req: NextRequest) {
             });
           }
         } else if (text.includes('ช่าง')) {
-          // Fetch active staff from DB
           const { data: staffList } = await supabaseAdmin
             .from('staff')
             .select('*')
