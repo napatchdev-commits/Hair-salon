@@ -49,7 +49,7 @@ export default function LiffBookingPage() {
             const profile = await liff.getProfile();
             setLineUserId(profile.userId);
             setLineDisplayName(profile.displayName);
-            setName(profile.displayName);
+            if (profile.displayName) setName(profile.displayName);
             
             // Check if customer exists in DB to prefill phone/email
             const { data: cust } = await supabase
@@ -63,6 +63,8 @@ export default function LiffBookingPage() {
               if (cust.phone) setPhone(cust.phone);
               if (cust.email) setEmail(cust.email);
             }
+          } else {
+            liff.login();
           }
         }
       } catch (err) {
