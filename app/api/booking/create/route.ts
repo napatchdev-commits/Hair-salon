@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
         { onConflict: 'staff_id,day_of_week' }
       );
     } else if (schedule.is_working === false) {
-      // Admin explicitly turned off this day
       return NextResponse.json({ error: 'ช่างหยุดให้บริการในวันที่เลือก' }, { status: 400 });
     }
 
@@ -65,9 +64,8 @@ export async function POST(req: NextRequest) {
       p_note: note || null,
     });
 
-    // If RPC threw OUTSIDE_WORKING_HOURS because staff schedule on DB is unconfigured, auto-repair and fallback
+    // Auto-repair schedule if RPC reported OUTSIDE_WORKING_HOURS
     if (rpcError && rpcError.message.includes('OUTSIDE_WORKING_HOURS')) {
-      // Upsert full 7-day schedule for this staff
       const defaultSchedules = Array.from({ length: 7 }, (_, i) => ({
         staff_id: staffId,
         day_of_week: i,
@@ -77,7 +75,6 @@ export async function POST(req: NextRequest) {
       }));
       await supabaseAdmin.from('staff_schedules').upsert(defaultSchedules, { onConflict: 'staff_id,day_of_week' });
 
-      // Retry RPC
       const retry = await supabaseAdmin.rpc('create_booking_atomic', {
         p_line_user_id: lineUserId,
         p_customer_name: customerName,
@@ -96,8 +93,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // JS Fallback if RPC failed or not present on Supabase
+    // Fallback if RPC fails or throws custom domain errors
     if (rpcError) {
+      console.warn('RPC create_booking_atomic error:', rpcError);
+
       if (rpcError.message.includes('TIME_SLOT_ALREADY_BOOKED')) {
         return NextResponse.json({ error: 'ขออภัย ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น' }, { status: 400 });
       } else if (rpcError.message.includes('STAFF_ON_HOLIDAY')) {
@@ -106,7 +105,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'เวลานี้ตรงกับเวลาพักของช่าง' }, { status: 400 });
       }
 
-      // Execute JS Fallback Booking Creation
+      // Fallback direct JS execution
       const { data: cust, error: custErr } = await supabaseAdmin
         .from('customers')
         .upsert(
@@ -122,17 +121,21 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (custErr || !cust) {
-        return NextResponse.json({ error: 'ไม่สามารถบันทึกข้อมูลลูกค้าได้' }, { status: 500 });
+        console.error('Customer upsert error:', custErr);
+        return NextResponse.json(
+          { error: `ไม่สามารถบันทึกข้อมูลลูกค้าใน Supabase ได้: ${custErr?.message || 'ข้อผิดพลาดใน Supabase'}` },
+          { status: 500 }
+        );
       }
 
-      const { data: srv } = await supabaseAdmin
+      const { data: srv, error: srvErr } = await supabaseAdmin
         .from('services')
         .select('*')
         .eq('id', serviceId)
         .single();
 
-      if (!srv) {
-        return NextResponse.json({ error: 'ไม่พบรายการบริการ' }, { status: 404 });
+      if (srvErr || !srv) {
+        return NextResponse.json({ error: 'ไม่พบรายการบริการในระบบ' }, { status: 404 });
       }
 
       const duration = srv.duration_minutes;
@@ -167,7 +170,7 @@ export async function POST(req: NextRequest) {
       const dateNum = bookingDate.replace(/-/g, '');
       const queueNumber = `Q-${dateNum}-${String(seq).padStart(3, '0')}`;
 
-      // Insert Appointment
+      // Insert Appointment into Supabase
       const { data: appt, error: apptErr } = await supabaseAdmin
         .from('appointments')
         .insert({
@@ -187,7 +190,11 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (apptErr || !appt) {
-        return NextResponse.json({ error: 'ไม่สามารถสร้างการจองคิวได้' }, { status: 500 });
+        console.error('Appointment insert error:', apptErr);
+        return NextResponse.json(
+          { error: `ไม่สามารถบันทึกคิวใน Supabase ได้: ${apptErr?.message || 'ข้อผิดพลาดใน Supabase'}` },
+          { status: 500 }
+        );
       }
 
       result = {
@@ -201,7 +208,7 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // Fetch staff name for notifications
+    // Push notification to Customer via LINE
     const { data: staffData } = await supabaseAdmin
       .from('staff')
       .select('name, nickname')
