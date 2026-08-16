@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ slots: availableSlots });
     }
 
-    // 2. JS Server Fallback (Handles cases where RPC is missing/returning empty due to unconfigured staff schedule)
+    // 2. JS Server Fallback (Starts from 07:00 AM by default)
     const targetDate = new Date(bookingDate);
     const dow = targetDate.getDay(); // 0=Sun, 6=Sat
 
@@ -51,19 +51,18 @@ export async function GET(req: NextRequest) {
       .eq('day_of_week', dow)
       .maybeSingle();
 
-    // If explicit day off is set by admin (is_working === false)
     if (schedule && schedule.is_working === false) {
       return NextResponse.json({ slots: [] });
     }
 
-    // Fetch salon default settings
+    // Fetch salon default settings (default open at 07:00:00)
     const { data: setting } = await supabaseAdmin
       .from('settings')
       .select('open_time, close_time')
       .maybeSingle();
 
-    const openTimeStr = schedule?.work_start_time || setting?.open_time || '10:00:00';
-    const closeTimeStr = schedule?.work_end_time || setting?.close_time || '20:00:00';
+    const openTimeStr = schedule?.work_start_time || setting?.open_time || '07:00:00';
+    const closeTimeStr = schedule?.work_end_time || setting?.close_time || '21:00:00';
 
     // Fetch service duration
     const { data: service } = await supabaseAdmin
@@ -93,7 +92,6 @@ export async function GET(req: NextRequest) {
       .eq('booking_date', bookingDate)
       .neq('status', 'cancelled');
 
-    // Helper functions for time math (HH:mm:ss -> minutes from midnight)
     const timeToMin = (t: string) => {
       const parts = t.split(':').map(Number);
       return parts[0] * 60 + parts[1];
@@ -105,10 +103,14 @@ export async function GET(req: NextRequest) {
       return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:00`;
     };
 
-    const workStartMin = timeToMin(openTimeStr);
-    const workEndMin = timeToMin(closeTimeStr);
+    // Ensure start time begins at least at 07:00 (420 minutes)
+    let workStartMin = timeToMin(openTimeStr);
+    let workEndMin = timeToMin(closeTimeStr);
 
-    // Current time in Bangkok
+    if (workStartMin > 420 && !schedule) {
+      workStartMin = 420; // 07:00 AM
+    }
+
     const nowBangkok = getBangkokNow();
     const todayStr = nowBangkok.toISOString().split('T')[0];
     const currentMin = nowBangkok.getHours() * 60 + nowBangkok.getMinutes();

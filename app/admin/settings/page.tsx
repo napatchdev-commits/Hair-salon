@@ -15,8 +15,8 @@ export default function AdminSettingsPage() {
   const [phone, setPhone] = useState<string>('');
   const [address, setAddress] = useState<string>('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState<string>('');
-  const [openTime, setOpenTime] = useState<string>('10:00');
-  const [closeTime, setCloseTime] = useState<string>('20:00');
+  const [openTime, setOpenTime] = useState<string>('07:00');
+  const [closeTime, setCloseTime] = useState<string>('21:00');
   const [minCancelHours, setMinCancelHours] = useState<number>(2);
   const [advanceBookingDays, setAdvanceBookingDays] = useState<number>(30);
   const [reminder24h, setReminder24h] = useState<boolean>(true);

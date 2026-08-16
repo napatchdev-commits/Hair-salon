@@ -96,9 +96,9 @@ export default function AdminStaffPage() {
         const defaultSchedules = Array.from({ length: 7 }, (_, i) => ({
           staff_id: newSt.id,
           day_of_week: i,
-          work_start_time: '10:00:00',
-          work_end_time: '19:00:00',
-          is_working: i !== 0, // Sunday off by default
+          work_start_time: '07:00:00',
+          work_end_time: '21:00:00',
+          is_working: true,
         }));
 
         await supabase.from('staff_schedules').insert(defaultSchedules);
