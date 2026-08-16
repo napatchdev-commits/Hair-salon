@@ -352,6 +352,16 @@ BEGIN
     FROM public.staff_schedules
     WHERE staff_id = p_staff_id AND day_of_week = v_dow;
 
+    -- Default to working 07:00-21:00 if no specific schedule row exists
+    IF v_is_working IS NULL THEN
+        v_is_working := true;
+        v_work_start := '07:00:00'::TIME;
+        v_work_end := '21:00:00'::TIME;
+    END IF;
+
+    IF v_work_start IS NULL THEN v_work_start := '07:00:00'::TIME; END IF;
+    IF v_work_end IS NULL THEN v_work_end := '21:00:00'::TIME; END IF;
+
     IF v_is_working IS NOT TRUE OR p_start_time < v_work_start OR v_end_time > v_work_end THEN
         RAISE EXCEPTION 'OUTSIDE_WORKING_HOURS';
     END IF;
