@@ -179,7 +179,15 @@ DECLARE
     v_is_holiday BOOLEAN;
     v_has_break BOOLEAN;
     v_has_conflict BOOLEAN;
+    v_default_open TIME;
+    v_default_close TIME;
+    v_current_date DATE;
+    v_current_time TIME;
 BEGIN
+    -- Get current date and time in Asia/Bangkok
+    v_current_date := (TIMEZONE('Asia/Bangkok', NOW()))::DATE;
+    v_current_time := (TIMEZONE('Asia/Bangkok', NOW()))::TIME;
+
     -- Get day of week (0=Sun, 6=Sat)
     v_dow := EXTRACT(DOW FROM p_booking_date);
 
@@ -193,15 +201,33 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Fetch default salon open/close times from settings
+    SELECT open_time, close_time INTO v_default_open, v_default_close
+    FROM public.settings
+    LIMIT 1;
+
+    IF v_default_open IS NULL THEN v_default_open := '10:00:00'::TIME; END IF;
+    IF v_default_close IS NULL THEN v_default_close := '20:00:00'::TIME; END IF;
+
     -- Get staff schedule for this day of week
     SELECT is_working, work_start_time, work_end_time 
     INTO v_is_working, v_work_start, v_work_end
     FROM public.staff_schedules
     WHERE staff_id = p_staff_id AND day_of_week = v_dow;
 
+    -- Default to working with salon operating hours if no specific schedule row exists
+    IF v_is_working IS NULL THEN
+        v_is_working := true;
+        v_work_start := v_default_open;
+        v_work_end := v_default_close;
+    END IF;
+
     IF v_is_working IS NOT TRUE THEN
         RETURN;
     END IF;
+
+    IF v_work_start IS NULL THEN v_work_start := v_default_open; END IF;
+    IF v_work_end IS NULL THEN v_work_end := v_default_close; END IF;
 
     -- Get service duration
     SELECT duration_minutes INTO v_duration
@@ -216,6 +242,12 @@ BEGIN
     v_slot := v_work_start;
     WHILE v_slot + (v_duration || ' minutes')::INTERVAL <= v_work_end LOOP
         v_slot_end := v_slot + (v_duration || ' minutes')::INTERVAL;
+
+        -- Filter past time slots if date is TODAY
+        IF p_booking_date = v_current_date AND v_slot < (v_current_time + INTERVAL '15 minutes') THEN
+            v_slot := v_slot + INTERVAL '30 minutes';
+            CONTINUE;
+        END IF;
 
         -- Check if slot overlaps with staff break
         SELECT EXISTS (
