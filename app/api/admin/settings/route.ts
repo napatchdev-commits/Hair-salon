@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       lineAdminUserId,
     } = body;
 
-    const payload = {
+    const fullPayload: Record<string, any> = {
       salon_name: salonName,
       phone: phone || '',
       address: address || '',
@@ -54,38 +54,60 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
+    const targetId = id || (await supabaseAdmin.from('settings').select('id').maybeSingle()).data?.id;
+
     let result;
-    if (id) {
-      const { data, error } = await supabaseAdmin
+    let updateErr;
+
+    if (targetId) {
+      const res = await supabaseAdmin
         .from('settings')
-        .update(payload)
-        .eq('id', id)
+        .update(fullPayload)
+        .eq('id', targetId)
+        .select()
+        .single();
+      
+      result = res.data;
+      updateErr = res.error;
+
+      // If column line_admin_user_id is missing in DB schema cache, retry without it
+      if (updateErr && updateErr.message.includes('line_admin_user_id')) {
+        delete fullPayload.line_admin_user_id;
+        const retryRes = await supabaseAdmin
+          .from('settings')
+          .update(fullPayload)
+          .eq('id', targetId)
+          .select()
+          .single();
+        
+        result = retryRes.data;
+        updateErr = retryRes.error;
+      }
+    } else {
+      const res = await supabaseAdmin
+        .from('settings')
+        .insert(fullPayload)
         .select()
         .single();
 
-      if (error) throw error;
-      result = data;
-    } else {
-      // Check if existing setting row exists
-      const { data: existing } = await supabaseAdmin.from('settings').select('id').maybeSingle();
-      if (existing) {
-        const { data, error } = await supabaseAdmin
+      result = res.data;
+      updateErr = res.error;
+
+      if (updateErr && updateErr.message.includes('line_admin_user_id')) {
+        delete fullPayload.line_admin_user_id;
+        const retryRes = await supabaseAdmin
           .from('settings')
-          .update(payload)
-          .eq('id', existing.id)
+          .insert(fullPayload)
           .select()
           .single();
-        if (error) throw error;
-        result = data;
-      } else {
-        const { data, error } = await supabaseAdmin
-          .from('settings')
-          .insert(payload)
-          .select()
-          .single();
-        if (error) throw error;
-        result = data;
+
+        result = retryRes.data;
+        updateErr = retryRes.error;
       }
+    }
+
+    if (updateErr) {
+      throw updateErr;
     }
 
     return NextResponse.json({ success: true, setting: result });

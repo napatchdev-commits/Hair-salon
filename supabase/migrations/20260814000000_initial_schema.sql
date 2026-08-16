@@ -27,8 +27,11 @@ CREATE TABLE IF NOT EXISTS public.settings (
     advance_booking_days INT NOT NULL DEFAULT 30,
     reminder_24h_active BOOLEAN NOT NULL DEFAULT true,
     reminder_1h_active BOOLEAN NOT NULL DEFAULT true,
+    line_admin_user_id TEXT DEFAULT '',
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('Asia/Bangkok', NOW())
 );
+
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS line_admin_user_id TEXT DEFAULT '';
 
 -- Initialize default single row in settings if empty
 INSERT INTO public.settings (salon_name)
