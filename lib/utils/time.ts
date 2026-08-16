@@ -27,13 +27,36 @@ export function formatThaiDate(dateStr: string | Date): string {
 }
 
 /**
- * Formats time from HH:mm:ss to HH:mm (e.g. 10:30)
+ * Formats time from HH:mm:ss to HH:mm (e.g. 10:30 น.)
  */
 export function formatTimeSlot(timeStr: string): string {
   if (!timeStr) return '';
   const parts = timeStr.split(':');
   if (parts.length < 2) return timeStr;
   return `${parts[0]}:${parts[1]} น.`;
+}
+
+/**
+ * Safely parses ANY time string (12-hour AM/PM or 24-hour) into valid 24-hour PostgreSQL TIME format HH:mm:00
+ */
+export function formatTo24HourTime(timeStr: string, fallbackDefault: string = '07:00:00'): string {
+  if (!timeStr) return fallbackDefault;
+  const clean = timeStr.trim();
+  const isPM = clean.toUpperCase().includes('PM');
+  const isAM = clean.toUpperCase().includes('AM');
+
+  const match = clean.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return fallbackDefault;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+
+  if (isPM && hours < 12) hours += 12;
+  if (isAM && hours === 12) hours = 0;
+
+  const hStr = String(hours).padStart(2, '0');
+  const mStr = String(minutes).padStart(2, '0');
+  return `${hStr}:${mStr}:00`;
 }
 
 /**
@@ -45,7 +68,6 @@ export function canCancelAppointment(
   minHoursNotice: number = 2
 ): { canCancel: boolean; message?: string } {
   try {
-    // Construct ISO string for appointment start
     const apptDateTimeStr = `${bookingDateStr}T${startTimeStr}`;
     const apptDateTime = new Date(apptDateTimeStr);
     const now = getBangkokNow();

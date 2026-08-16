@@ -87,7 +87,18 @@ export default function AdminSettingsPage() {
       }
 
       if (json.setting) {
-        setSettingId(json.setting.id);
+        const s = json.setting;
+        setSettingId(s.id);
+        setSalonName(s.salon_name || 'Hair Salon');
+        setPhone(s.phone || '');
+        setAddress(s.address || '');
+        setGoogleMapsUrl(s.google_maps_url || '');
+        setOpenTime(s.open_time ? s.open_time.substring(0, 5) : '07:00');
+        setCloseTime(s.close_time ? s.close_time.substring(0, 5) : '21:00');
+        setMinCancelHours(s.min_cancel_hours ?? 2);
+        setAdvanceBookingDays(s.advance_booking_days ?? 30);
+        setReminder24h(s.reminder_24h_active ?? true);
+        setReminder1h(s.reminder_1h_active ?? true);
       }
 
       setSuccessNotice(true);

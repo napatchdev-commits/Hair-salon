@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { formatTo24HourTime } from '@/lib/utils/time';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,8 +43,8 @@ export async function POST(req: NextRequest) {
       phone: phone || '',
       address: address || '',
       google_maps_url: googleMapsUrl || '',
-      open_time: openTime.includes(':') ? (openTime.split(':').length === 2 ? `${openTime}:00` : openTime) : '07:00:00',
-      close_time: closeTime.includes(':') ? (closeTime.split(':').length === 2 ? `${closeTime}:00` : closeTime) : '21:00:00',
+      open_time: formatTo24HourTime(openTime, '07:00:00'),
+      close_time: formatTo24HourTime(closeTime, '21:00:00'),
       min_cancel_hours: Number(minCancelHours) || 2,
       advance_booking_days: Number(advanceBookingDays) || 30,
       reminder_24h_active: Boolean(reminder24h),
