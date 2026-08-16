@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Settings as SettingsIcon, Save, Store, Clock, ShieldAlert, Bell, Loader2, CheckCircle2 } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Store, Clock, ShieldAlert, Bell, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function AdminSettingsPage() {
-  const supabase = createClient();
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [settingId, setSettingId] = useState<string>('');
@@ -23,6 +21,7 @@ export default function AdminSettingsPage() {
   const [reminder1h, setReminder1h] = useState<boolean>(true);
 
   const [successNotice, setSuccessNotice] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   useEffect(() => {
     fetchSettings();
@@ -30,23 +29,28 @@ export default function AdminSettingsPage() {
 
   async function fetchSettings() {
     setLoading(true);
+    setErrorMsg('');
     try {
-      const { data, error } = await supabase.from('settings').select('*').maybeSingle();
+      const res = await fetch('/api/admin/settings');
+      const json = await res.json();
+      const data = json.setting;
+
       if (data) {
         setSettingId(data.id);
         setSalonName(data.salon_name || 'Hair Salon');
         setPhone(data.phone || '');
         setAddress(data.address || '');
         setGoogleMapsUrl(data.google_maps_url || '');
-        setOpenTime(data.open_time ? data.open_time.substring(0, 5) : '10:00');
-        setCloseTime(data.close_time ? data.close_time.substring(0, 5) : '20:00');
+        setOpenTime(data.open_time ? data.open_time.substring(0, 5) : '07:00');
+        setCloseTime(data.close_time ? data.close_time.substring(0, 5) : '21:00');
         setMinCancelHours(data.min_cancel_hours ?? 2);
         setAdvanceBookingDays(data.advance_booking_days ?? 30);
         setReminder24h(data.reminder_24h_active ?? true);
         setReminder1h(data.reminder_1h_active ?? true);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setErrorMsg('ไม่สามารถโหลดการตั้งค่าได้');
     } finally {
       setLoading(false);
     }
@@ -56,34 +60,40 @@ export default function AdminSettingsPage() {
     e.preventDefault();
     setSaving(true);
     setSuccessNotice(false);
+    setErrorMsg('');
 
     try {
-      const payload = {
-        salon_name: salonName,
-        phone,
-        address,
-        google_maps_url: googleMapsUrl,
-        open_time: `${openTime}:00`,
-        close_time: `${closeTime}:00`,
-        min_cancel_hours: Number(minCancelHours),
-        advance_booking_days: Number(advanceBookingDays),
-        reminder_24h_active: reminder24h,
-        reminder_1h_active: reminder1h,
-        updated_at: new Date().toISOString(),
-      };
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: settingId,
+          salonName,
+          phone,
+          address,
+          googleMapsUrl,
+          openTime,
+          closeTime,
+          minCancelHours,
+          advanceBookingDays,
+          reminder24h,
+          reminder1h,
+        }),
+      });
 
-      if (settingId) {
-        const { error } = await supabase.from('settings').update(payload).eq('id', settingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('settings').insert(payload);
-        if (error) throw error;
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'ไม่สามารถบันทึกการตั้งค่าได้');
+      }
+
+      if (json.setting) {
+        setSettingId(json.setting.id);
       }
 
       setSuccessNotice(true);
       setTimeout(() => setSuccessNotice(false), 4000);
     } catch (err: any) {
-      alert(err.message || 'เกิดข้อผิดพลาดในการบันทึกการตั้งค่า');
+      setErrorMsg(err.message || 'เกิดข้อผิดพลาดในการบันทึกการตั้งค่า');
     } finally {
       setSaving(false);
     }
@@ -122,9 +132,16 @@ export default function AdminSettingsPage() {
       </div>
 
       {successNotice && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 p-3 rounded-xl text-xs flex items-center space-x-2">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 p-3.5 rounded-xl text-xs flex items-center space-x-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>บันทึกข้อมูลการตั้งค่าระบบเรียบร้อยแล้ว</span>
+          <span>บันทึกข้อมูลการตั้งค่าร้านสำเร็จแล้ว (ข้อมูลได้รับการอัปเดตลงฐานข้อมูลแล้ว)</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-3.5 rounded-xl text-xs flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{errorMsg}</span>
         </div>
       )}
 
